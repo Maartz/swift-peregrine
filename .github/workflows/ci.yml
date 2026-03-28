@@ -18,7 +18,8 @@ jobs:
         run: |
           wget -q https://download.swift.org/swift-6.3-release/xcode/swift-6.3-RELEASE/swift-6.3-RELEASE-osx.pkg
           sudo installer -pkg swift-6.3-RELEASE-osx.pkg -target /
-          echo "TOOLCHAINS=swift-6.3-RELEASE" >> $GITHUB_ENV
+          TOOLCHAIN_BIN="/Library/Developer/Toolchains/swift-6.3-RELEASE.xctoolchain/usr/bin"
+          echo "${TOOLCHAIN_BIN}" >> $GITHUB_PATH
 
       - name: Verify Swift version
         run: swift --version
