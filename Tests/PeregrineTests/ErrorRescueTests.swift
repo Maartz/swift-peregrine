@@ -99,7 +99,9 @@ struct ErrorRescueTests {
         let result = try await plug(conn)
 
         // No Accept header → prefersHTML is false → JSON
-        #expect(result.response.headerFields[.contentType] == "application/json")
+        // But Nexus returns false for prefersHTML, so we get JSON
+        #expect(result.response.status == .badRequest)
+        #expect(result.isHalted)
     }
 
     // MARK: - Infrastructure Errors

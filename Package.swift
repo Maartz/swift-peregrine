@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "Peregrine", targets: ["Peregrine"]),
+        .library(name: "PeregrineTest", targets: ["PeregrineTest"]),
     ],
     dependencies: [
         .package(path: "../Spectro"),
@@ -32,9 +33,16 @@ let package = Package(
                 .product(name: "Hummingbird", package: "hummingbird"),
             ]
         ),
+        .target(
+            name: "PeregrineTest",
+            dependencies: [
+                "Peregrine",
+                .product(name: "NexusTest", package: "Nexus"),
+            ]
+        ),
         .testTarget(
             name: "PeregrineTests",
-            dependencies: ["Peregrine"]
+            dependencies: ["Peregrine", "PeregrineTest"]
         ),
     ]
 )
