@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 
 import PackageDescription
 
@@ -16,7 +16,8 @@ let package = Package(
         .package(path: "../esw"),
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
-            from: "2.0.0"
+            from: "2.0.0",
+            traits: []
         ),
     ],
     targets: [
