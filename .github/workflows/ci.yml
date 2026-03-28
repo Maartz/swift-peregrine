@@ -14,16 +14,6 @@ jobs:
   build-and-test:
     runs-on: macos-15
     steps:
-      - name: Install Swift 6.3 toolchain
-        run: |
-          wget -q https://download.swift.org/swift-6.3-release/xcode/swift-6.3-RELEASE/swift-6.3-RELEASE-osx.pkg
-          sudo installer -pkg swift-6.3-RELEASE-osx.pkg -target /
-          TOOLCHAIN_BIN="/Library/Developer/Toolchains/swift-6.3-RELEASE.xctoolchain/usr/bin"
-          echo "${TOOLCHAIN_BIN}" >> $GITHUB_PATH
-
-      - name: Verify Swift version
-        run: swift --version
-
       - name: Checkout Peregrine
         uses: actions/checkout@v4
         with:
@@ -47,16 +37,9 @@ jobs:
           repository: Spectro-ORM/ESW
           path: esw
 
-      - name: Resolve packages
-        working-directory: Peregrine
-        run: swift package resolve
-
-      - name: Patch swift-configuration for Swift 6.3 compatibility
+      - name: Pin ESW to Swift 6.1 tools version
         run: |
-          FILE="Peregrine/.build/checkouts/swift-configuration/Sources/Configuration/Providers/Files/FileProvider.swift"
-          if [ -f "$FILE" ]; then
-            sed -i '' 's/data: fileContents!\.bytes/data: Array(fileContents!)/' "$FILE"
-          fi
+          sed -i '' 's|swift-tools-version: 6.3|swift-tools-version: 6.1|' esw/Package.swift
 
       - name: Build
         working-directory: Peregrine
