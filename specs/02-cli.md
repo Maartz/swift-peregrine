@@ -213,7 +213,58 @@ $ peregrine server --port 4000
 
 ---
 
-## 3. Package Structure
+## 3. Terminal UI — Noora
+
+All CLI output uses [Noora](https://github.com/tuist/Noora) for polished
+terminal UI, consistent with Spectro's CLI. Define a `PeregrineUI` helper
+(same pattern as Spectro's `SpectroUI`):
+
+```swift
+// Sources/PeregrineCLI/Utils/PeregrineUI.swift
+@preconcurrency import Noora
+
+enum PeregrineUI {
+    static let noora = Noora(theme: Theme(
+        primary: "F97316",    // peregrine orange
+        secondary: "FB923C",
+        muted: "6B7280",
+        accent: "F59E0B",
+        danger: "EF4444",
+        success: "10B981",
+        info: "3B82F6",
+        selectedRowText: "FFFFFF",
+        selectedRowBackground: "7C2D12"
+    ))
+}
+```
+
+Usage in commands:
+
+```swift
+// Success
+PeregrineUI.noora.success(.alert(
+    "Project \(.primary(appName)) created",
+    takeaways: [
+        "cd \(.command(appName))",
+        "swift run",
+    ]
+))
+
+// File creation
+PeregrineUI.noora.info(.alert(
+    "create \(.muted(filePath))"
+))
+
+// Errors
+PeregrineUI.noora.error(.alert(
+    "Failed to generate \(.primary(name))",
+    takeaways: ["\(.muted("\(error)"))"]
+))
+```
+
+---
+
+## 4. Package Structure
 
 ```swift
 // In Package.swift, add:
@@ -222,25 +273,35 @@ $ peregrine server --port 4000
     dependencies: [
         "Peregrine",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Noora", package: "Noora"),
     ]
 )
+```
+
+Dependencies to add:
+
+```swift
+.package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
+.package(url: "https://github.com/tuist/Noora", .upToNextMajor(from: "0.15.0")),
 ```
 
 Distribute via Mint:
 
 ```
 # Mintfile
-alembic-labs/swift-peregrine
+Maartz/swift-peregrine
 ```
 
 ```bash
-mint install alembic-labs/swift-peregrine
+mint install Maartz/swift-peregrine
 ```
 
 ---
 
-## 4. Acceptance Criteria
+## 5. Acceptance Criteria
 
+- [ ] All CLI output uses Noora (no raw `print` statements)
+- [ ] `PeregrineUI` follows same pattern as Spectro's `SpectroUI`
 - [ ] `peregrine new AppName` generates a buildable project that runs on first `swift run`
 - [ ] Generated `App.swift` is <15 lines and uses `PeregrineApp` protocol
 - [ ] `peregrine gen.schema` generates `@Schema` model + SQL migration
@@ -260,7 +321,7 @@ mint install alembic-labs/swift-peregrine
 
 ---
 
-## 5. Non-goals
+## 6. Non-goals
 
 - No interactive prompts (fully non-interactive CLI).
 - No database creation command (use `createdb` or Spectro's `spectro database create`).
