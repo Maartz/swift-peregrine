@@ -7,6 +7,9 @@ struct PeregrineCLI: AsyncParsableCommand {
         abstract: "The Peregrine web framework CLI",
         subcommands: [
             New.self,
+            Gen.self,
+            Migrate.self,
+            Server.self,
         ]
     )
 }
