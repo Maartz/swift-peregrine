@@ -22,19 +22,19 @@ jobs:
       - name: Checkout Spectro
         uses: actions/checkout@v4
         with:
-          repository: Maartz/Spectro
+          repository: Spectro-ORM/Spectro
           path: Spectro
 
       - name: Checkout Nexus
         uses: actions/checkout@v4
         with:
-          repository: Maartz/Nexus
+          repository: Spectro-ORM/Nexus
           path: Nexus
 
       - name: Checkout ESW
         uses: actions/checkout@v4
         with:
-          repository: Maartz/esw
+          repository: Spectro-ORM/ESW
           path: esw
 
       - name: Build
