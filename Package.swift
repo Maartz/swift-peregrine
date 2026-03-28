@@ -16,8 +16,7 @@ let package = Package(
         .package(path: "../esw"),
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
-            from: "2.0.0",
-            traits: []
+            from: "2.0.0"
         ),
     ],
     targets: [

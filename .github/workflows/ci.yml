@@ -47,6 +47,17 @@ jobs:
           repository: Spectro-ORM/ESW
           path: esw
 
+      - name: Resolve packages
+        working-directory: Peregrine
+        run: swift package resolve
+
+      - name: Patch swift-configuration for Swift 6.3 compatibility
+        run: |
+          FILE="Peregrine/.build/checkouts/swift-configuration/Sources/Configuration/Providers/Files/FileProvider.swift"
+          if [ -f "$FILE" ]; then
+            sed -i '' 's/data: fileContents!\.bytes/data: Array(fileContents!)/' "$FILE"
+          fi
+
       - name: Build
         working-directory: Peregrine
         run: swift build
