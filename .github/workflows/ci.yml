@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - name: Checkout Peregrine
+        uses: actions/checkout@v4
+        with:
+          path: Peregrine
+
+      - name: Checkout Spectro
+        uses: actions/checkout@v4
+        with:
+          repository: Maartz/Spectro
+          path: Spectro
+
+      - name: Checkout Nexus
+        uses: actions/checkout@v4
+        with:
+          repository: Maartz/Nexus
+          path: Nexus
+
+      - name: Checkout ESW
+        uses: actions/checkout@v4
+        with:
+          repository: Maartz/esw
+          path: esw
+
+      - name: Build
+        working-directory: Peregrine
+        run: swift build
+
+      - name: Test
+        working-directory: Peregrine
+        run: swift test
