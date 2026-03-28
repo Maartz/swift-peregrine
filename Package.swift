@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "Peregrine", targets: ["Peregrine"]),
         .library(name: "PeregrineTest", targets: ["PeregrineTest"]),
+        .executable(name: "peregrine", targets: ["PeregrineCLI"]),
     ],
     dependencies: [
         .package(path: "../Spectro"),
@@ -18,6 +19,14 @@ let package = Package(
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
             from: "2.0.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-argument-parser",
+            from: "1.2.0"
+        ),
+        .package(
+            url: "https://github.com/tuist/Noora",
+            .upToNextMajor(from: "0.15.0")
         ),
     ],
     targets: [
@@ -38,6 +47,13 @@ let package = Package(
             dependencies: [
                 "Peregrine",
                 .product(name: "NexusTest", package: "Nexus"),
+            ]
+        ),
+        .executableTarget(
+            name: "PeregrineCLI",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Noora", package: "Noora"),
             ]
         ),
         .testTarget(
