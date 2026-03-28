@@ -34,6 +34,12 @@ public protocol PeregrineApp {
     /// Called during startup to allow per-environment configuration.
     func configure(for env: Environment)
 
+    /// Optional custom error page renderer. Return a `Connection` to
+    /// render your own page, or `nil` to use Peregrine's default.
+    ///
+    /// Use this to hook in compiled ESW error templates (e.g. `Views/errors/404.esw`).
+    var customErrorPage: ErrorPageRenderer? { get }
+
     /// Application entry point. A default implementation is provided
     /// that wires everything together and starts the server.
     static func main() async throws
@@ -57,6 +63,8 @@ extension PeregrineApp {
     public func willStart(spectro: SpectroClient) async throws {}
 
     public func configure(for env: Environment) {}
+
+    public var customErrorPage: ErrorPageRenderer? { nil }
 }
 
 // MARK: - Bootstrap
@@ -96,7 +104,10 @@ extension PeregrineApp {
         }
 
         allPlugs.append(routerPlug)
-        let finalPlug = rescueErrors(pipeline(allPlugs))
+        let finalPlug = peregrine_rescueErrors(
+            pipeline(allPlugs),
+            customErrorPage: app.customErrorPage
+        )
 
         // Boot server
         let config = app.server
