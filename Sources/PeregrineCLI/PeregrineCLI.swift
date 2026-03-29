@@ -10,6 +10,7 @@ struct PeregrineCLI: AsyncParsableCommand {
             Gen.self,
             Migrate.self,
             Server.self,
+            Build.self,
         ]
     )
 }

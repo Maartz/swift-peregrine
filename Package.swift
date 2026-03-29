@@ -13,9 +13,18 @@ let package = Package(
         .executable(name: "peregrine", targets: ["PeregrineCLI"]),
     ],
     dependencies: [
-        .package(path: "../Spectro"),
-        .package(path: "../Nexus"),
-        .package(path: "../esw"),
+        .package(
+            url: "https://github.com/Spectro-ORM/Spectro.git",
+            from: "1.2.0"
+        ),
+        .package(
+            url: "https://github.com/Spectro-ORM/Nexus.git",
+            from: "1.2.0"
+        ),
+        .package(
+            url: "https://github.com/Spectro-ORM/ESW.git",
+            from: "1.0.0"
+        ),
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
             from: "2.0.0"
@@ -27,6 +36,10 @@ let package = Package(
         .package(
             url: "https://github.com/tuist/Noora",
             .upToNextMajor(from: "0.15.0")
+        ),
+        .package(
+            url: "https://github.com/apple/swift-crypto.git",
+            from: "3.0.0"
         ),
     ],
     targets: [
@@ -40,6 +53,7 @@ let package = Package(
                 .product(name: "NexusTest", package: "Nexus"),
                 .product(name: "ESW", package: "esw"),
                 .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ]
         ),
         .target(
@@ -62,6 +76,7 @@ let package = Package(
                 "Peregrine",
                 "PeregrineTest",
                 .product(name: "NexusTest", package: "Nexus"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ]
         ),
     ]

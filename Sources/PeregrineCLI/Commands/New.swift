@@ -17,6 +17,18 @@ struct New: AsyncParsableCommand {
     @Flag(name: .long, help: "Omit Views directory and ESW templates")
     var noEsw = false
 
+    @Option(name: .long, help: "Pico CSS color theme (default: orange). Mutually exclusive with --tailwind.")
+    var color: String?
+
+    @Flag(name: .long, help: "Use Tailwind CSS instead of Pico CSS. Mutually exclusive with --color.")
+    var tailwind = false
+
+    static let validColors: [String] = [
+        "amber", "blue", "cyan", "fuchsia", "green", "grey", "indigo", "jade",
+        "lime", "orange", "pink", "pumpkin", "purple", "red", "sand", "slate",
+        "violet", "yellow", "zinc",
+    ]
+
     func run() async throws {
         let cwd = FileManager.default.currentDirectoryPath
         let projectDir = (cwd as NSString).appendingPathComponent(appName)
@@ -29,10 +41,39 @@ struct New: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
+        // Validate mutually exclusive flags
+        if tailwind && color != nil {
+            PeregrineUI.noora.error(.alert(
+                "Options \(.primary("--tailwind")) and \(.primary("--color")) are mutually exclusive.",
+                takeaways: ["Use --tailwind for Tailwind CSS, or --color <name> for Pico CSS."]
+            ))
+            throw ExitCode.failure
+        }
+
+        // Validate color value
+        let resolvedColor = color ?? "orange"
+        if color != nil && !Self.validColors.contains(resolvedColor) {
+            PeregrineUI.noora.error(.alert(
+                "Invalid color \(.primary(resolvedColor)).",
+                takeaways: ["Available colors: \(Self.validColors.joined(separator: ", "))"]
+            ))
+            throw ExitCode.failure
+        }
+
         PeregrineUI.noora.info(.alert("Creating \(.primary(appName))..."))
 
         let includeDB = !noDb
         let includeESW = !noEsw
+
+        // Determine CSS mode
+        let cssMode: ProjectTemplates.CSSMode
+        if noEsw {
+            cssMode = .none
+        } else if tailwind {
+            cssMode = .tailwind
+        } else {
+            cssMode = .pico
+        }
 
         // Package.swift
         try FileCreator.create(
@@ -71,7 +112,7 @@ struct New: AsyncParsableCommand {
             try FileCreator.create(
                 at: "Sources/\(appName)/Views/layout.esw",
                 in: projectDir,
-                content: ProjectTemplates.layoutESW(appName: appName)
+                content: ProjectTemplates.layoutESW(appName: appName, cssMode: cssMode)
             )
         }
 
@@ -108,11 +149,26 @@ struct New: AsyncParsableCommand {
             content: ""
         )
 
+        // CSS setup (skip if --no-esw)
+        if !noEsw {
+            switch cssMode {
+            case .pico:
+                try await setupPicoCSS(in: projectDir, color: resolvedColor)
+            case .tailwind:
+                try await setupTailwindCSS(in: projectDir)
+            case .none:
+                break
+            }
+        }
+
         // .gitignore
+        let gitignoreContent = tailwind
+            ? ProjectTemplates.gitignore + "\n.build/tailwindcss\n"
+            : ProjectTemplates.gitignore
         try FileCreator.create(
             at: ".gitignore",
             in: projectDir,
-            content: ProjectTemplates.gitignore
+            content: gitignoreContent
         )
 
         // .swift-format
@@ -129,5 +185,83 @@ struct New: AsyncParsableCommand {
                 "swift run",
             ]
         ))
+    }
+
+    // MARK: - Pico CSS Setup
+
+    private func setupPicoCSS(in projectDir: String, color: String) async throws {
+        // Download Pico CSS
+        let picoFileName = color == "orange" ? "pico.min.css" : "pico.\(color).min.css"
+        let picoURL = URL(string: "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/\(picoFileName)")!
+        let picoDestination = (projectDir as NSString).appendingPathComponent("Public/css/pico.min.css")
+
+        PeregrineUI.noora.info(.alert("Downloading Pico CSS (\(.primary(color)))..."))
+
+        do {
+            try await Downloader.download(from: picoURL, to: picoDestination)
+            PeregrineUI.noora.success(.alert("create  \(.muted("Public/css/pico.min.css"))"))
+        } catch {
+            PeregrineUI.noora.warning(.alert(
+                "Could not download Pico CSS: \(error.localizedDescription)"
+            ))
+            PeregrineUI.noora.info(.alert(
+                "You can manually download it from \(picoURL.absoluteString)"
+            ))
+        }
+
+        // Create app.css
+        try FileCreator.create(
+            at: "Public/css/app.css",
+            in: projectDir,
+            content: "/* App-specific styles */\n"
+        )
+    }
+
+    // MARK: - Tailwind CSS Setup
+
+    private func setupTailwindCSS(in projectDir: String) async throws {
+        // Download Tailwind binary
+        let binaryName = Platform.tailwindBinaryName
+        let tailwindURL = URL(
+            string: "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/\(binaryName)"
+        )!
+        let tailwindDestination = (projectDir as NSString).appendingPathComponent(".build/tailwindcss")
+
+        PeregrineUI.noora.info(.alert("Downloading Tailwind CSS CLI..."))
+
+        do {
+            try await Downloader.download(from: tailwindURL, to: tailwindDestination)
+
+            // Make binary executable
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o755],
+                ofItemAtPath: tailwindDestination
+            )
+            PeregrineUI.noora.success(.alert("create  \(.muted(".build/tailwindcss"))"))
+        } catch {
+            PeregrineUI.noora.warning(.alert(
+                "Could not download Tailwind CSS CLI: \(error.localizedDescription)"
+            ))
+            PeregrineUI.noora.info(.alert(
+                "You can manually download it from \(tailwindURL.absoluteString)"
+            ))
+            PeregrineUI.noora.info(.alert(
+                "Place the binary at .build/tailwindcss and make it executable."
+            ))
+        }
+
+        // Create tailwind.config.js
+        try FileCreator.create(
+            at: "tailwind.config.js",
+            in: projectDir,
+            content: ProjectTemplates.tailwindConfig(appName: appName)
+        )
+
+        // Create input.css with Tailwind directives
+        try FileCreator.create(
+            at: "Public/css/input.css",
+            in: projectDir,
+            content: ProjectTemplates.tailwindInputCSS
+        )
     }
 }

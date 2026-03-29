@@ -78,28 +78,83 @@ enum ProjectTemplates {
         """
     }
 
+    // MARK: - CSS Mode
+
+    enum CSSMode {
+        case none
+        case pico
+        case tailwind
+    }
+
     // MARK: - layout.esw
 
-    static func layoutESW(appName: String) -> String {
+    static func layoutESW(appName: String, cssMode: CSSMode = .none) -> String {
+        let picoLink = """
+                <link rel="stylesheet" href="/css/pico.min.css">
+
         """
+        let appCSSLink = """
+                <link rel="stylesheet" href="/css/app.css">
+
+        """
+
+        let cssLinks: String
+        switch cssMode {
+        case .none:
+            cssLinks = ""
+        case .pico:
+            cssLinks = picoLink + appCSSLink
+        case .tailwind:
+            cssLinks = appCSSLink
+        }
+
+        let themeAttr = cssMode == .pico ? #" data-theme="light""# : ""
+
+        return """
         <%!
         var conn: Connection
         var title: String
         var content: String
         %>
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang="en"\(themeAttr)>
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title><%= title %> — \(appName)</title>
+            \(cssLinks.isEmpty ? "" : cssLinks.trimmingCharacters(in: .newlines))
         </head>
         <body>
+            \(cssMode == .pico ? #"<main class="container">"# : "")
             <%- content %>
+            \(cssMode == .pico ? "</main>" : "")
         </body>
         </html>
         """
     }
+
+    // MARK: - Tailwind config
+
+    static func tailwindConfig(appName: String) -> String {
+        """
+        /** @type {import('tailwindcss').Config} */
+        module.exports = {
+          content: ["./Sources/\(appName)/Views/**/*.esw"],
+          theme: {
+            extend: {},
+          },
+          plugins: [],
+        }
+        """
+    }
+
+    // MARK: - Tailwind input CSS
+
+    static let tailwindInputCSS = """
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    """
 
     // MARK: - .gitignore
 

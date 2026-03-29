@@ -9,6 +9,7 @@ struct Gen: AsyncParsableCommand {
             GenJSON.self,
             GenHTML.self,
             GenAuth.self,
+            GenDockerfile.self,
         ]
     )
 }
