@@ -226,6 +226,48 @@
 
 ---
 
+## Sprint 12: Asset Pipeline & Default Styling
+
+**Goal:** Generated pages look professional by default. Pico CSS out of the box, Tailwind opt-in.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 12.1 | Download Pico CSS on `peregrine new` | 12 §2.2 | `Public/css/pico.min.css` |
+| 12.2 | `--color` flag with all 19 Pico themes | 12 §2.1 | `pico.{color}.min.css` |
+| 12.3 | Generate styled `layout.esw` with Pico link | 12 §2.2 | Semantic HTML layout |
+| 12.4 | `Public/css/app.css` for custom overrides | 12 §2.2 | Override file |
+| 12.5 | Update `gen.html` to produce Pico-compatible HTML | 12 §2.3 | Semantic templates |
+| 12.6 | Update `gen.auth` templates for Pico styling | 12 §2.3 | Styled forms |
+| 12.7 | `--tailwind` flag: download CLI binary | 12 §2.5-2.6 | Standalone binary |
+| 12.8 | `--tailwind`: generate config + input.css | 12 §2.7 | Tailwind setup |
+| 12.9 | `peregrine build` command (assets + Swift) | 12 §2.8 | Build pipeline |
+| 12.10 | Tests: color validation, file download, mutual exclusion | 12 §3 | Test suite |
+
+**Exit criteria:** `peregrine new MyApp && swift run` serves styled pages. `peregrine new MyApp --tailwind` sets up Tailwind with no Node dependency.
+
+---
+
+## Sprint 13: Development Server with Watch Mode
+
+**Goal:** `peregrine build --watch` gives you edit-save-see in seconds.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 13.1 | `peregrine build` command (assets + Swift) | 13 §2.1 | Unified build |
+| 13.2 | File watcher for `.swift` and `.esw` changes | 13 §2.3 | OS-native or polling |
+| 13.3 | `--watch` mode: rebuild + restart on change | 13 §2.2 | Watch loop |
+| 13.4 | Debouncing (300ms) for rapid saves | 13 §2.2 | Debounce logic |
+| 13.5 | Process management: start, SIGTERM, restart | 13 §2.4 | Child process lifecycle |
+| 13.6 | Build failure handling (keep old server alive) | 13 §2.5 | Error resilience |
+| 13.7 | Tailwind watch integration (parallel process) | 13 §2.6 | CSS live rebuild |
+| 13.8 | `peregrine server` as alias for `build --watch` | 13 §2.7 | Alias command |
+| 13.9 | Ignore temp files (`.swp`, `~`, `.tmp`) | 13 §3 | Editor compatibility |
+| 13.10 | Clean `Ctrl+C` shutdown of all child processes | 13 §2.4 | Signal handling |
+
+**Exit criteria:** `peregrine build --watch` starts the server and automatically rebuilds + restarts when source files change. Build errors don't kill the running server.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -250,15 +292,22 @@ Sprint 1 (bootstrap)
               │               │               │
               └───────┬───────┘               │
                       │                       │
-                Sprint 10 ◄───────────────────┘
-               (gen.auth)
+                Sprint 12 ◄───────────────────┘
+              (asset pipeline)
                       │
-                Sprint 11
-            (deploy + tokens)
+              ┌───────┴───────┐
+              │               │
+        Sprint 10       Sprint 13
+        (gen.auth)      (dev server)
+              │
+        Sprint 11
+    (deploy + tokens)
 ```
 
-Sprints 7–9 can run in parallel. Sprint 10 depends on 8 (CSRF) and 9 (templates need static CSS).
-Sprint 11 can start after 10 or in parallel with late Sprint 10 tasks.
+Sprints 7–9 can run in parallel. Sprint 12 depends on 9 (static files).
+Sprint 10 depends on 8 (CSRF) and 12 (styled templates).
+Sprint 13 depends on 12 (build command).
+Sprint 11 can start after 10 or in parallel.
 
 ---
 
@@ -278,3 +327,5 @@ Sprint 11 can start after 10 or in parallel with late Sprint 10 tasks.
 | 9 | Static files | Serve CSS/JS/images from `Public/` |
 | 10 | Auth generator | `peregrine gen.auth` — register, login, logout |
 | 11 | Production | Dockerfile generation, signed tokens |
+| 12 | Asset pipeline | Pico CSS default, Tailwind opt-in, `peregrine build` |
+| 13 | Dev server | `peregrine build --watch` with auto-rebuild |
