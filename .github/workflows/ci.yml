@@ -41,6 +41,15 @@ jobs:
         run: |
           sed -i '' 's|swift-tools-version: 6.3|swift-tools-version: 6.1|' esw/Package.swift
 
+      - name: Override remote deps with local checkouts
+        working-directory: Peregrine
+        run: |
+          sed -i '' \
+            -e 's|.package(url: "https://github.com/Spectro-ORM/Spectro.git", from: "1.2.0")|.package(path: "../Spectro")|' \
+            -e 's|.package(url: "https://github.com/Spectro-ORM/Nexus.git", from: "1.2.0")|.package(path: "../Nexus")|' \
+            -e 's|.package(url: "https://github.com/Spectro-ORM/ESW.git", from: "1.0.0")|.package(path: "../esw")|' \
+            Package.swift
+
       - name: Build
         working-directory: Peregrine
         run: swift build
