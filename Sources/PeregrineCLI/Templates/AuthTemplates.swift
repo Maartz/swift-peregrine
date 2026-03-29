@@ -87,11 +87,10 @@ enum AuthTemplates {
         func authRoutes() -> [Route] {
             // GET /auth/register — show registration form
             GET("/register") { conn in
-                return renderRegister(
-                    conn: conn,
-                    error: conn.flash.error,
-                    csrfToken: conn.assigns["csrfToken"] as? String ?? ""
-                )
+                return try conn.render("auth/register", [
+                    "error": conn.flash.error as Any,
+                    "csrfToken": conn.assigns["csrfToken"] as? String ?? "",
+                ])
             }
 
             // POST /auth/register — create user account
@@ -144,11 +143,10 @@ enum AuthTemplates {
 
             // GET /auth/login — show login form
             GET("/login") { conn in
-                return renderLogin(
-                    conn: conn,
-                    error: conn.flash.error,
-                    csrfToken: conn.assigns["csrfToken"] as? String ?? ""
-                )
+                return try conn.render("auth/login", [
+                    "error": conn.flash.error as Any,
+                    "csrfToken": conn.assigns["csrfToken"] as? String ?? "",
+                ])
             }
 
             // POST /auth/login — authenticate and create session
@@ -306,7 +304,11 @@ enum AuthTemplates {
             static func generateToken() -> String {
                 var bytes = [UInt8](repeating: 0, count: 32)
                 _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-                return Base64URL.encode(Data(bytes))
+                return Data(bytes)
+                    .base64EncodedString()
+                    .replacingOccurrences(of: "+", with: "-")
+                    .replacingOccurrences(of: "/", with: "_")
+                    .replacingOccurrences(of: "=", with: "")
             }
         }
         """

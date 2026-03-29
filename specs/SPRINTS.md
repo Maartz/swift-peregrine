@@ -268,6 +268,160 @@
 
 ---
 
+## Sprint 14: WebSocket Channels
+
+**Goal:** Real-time communication. Push updates to connected clients.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 14.1 | Add `hummingbird-websocket` dependency | 14 §2.1 | Package resolves |
+| 14.2 | `PeregrineChannel` protocol | 14 §2.2 | `onJoin`, `onMessage`, `onData`, `onLeave` |
+| 14.3 | `WebSocket` wrapper with send/close API | 14 §2.4 | Clean send interface |
+| 14.4 | `ChannelRegistry` actor for topic-based tracking | 14 §2.5 | Thread-safe socket registry |
+| 14.5 | `Broadcast.send` and `Broadcast.sendOthers` | 14 §2.5 | Broadcast to topic |
+| 14.6 | `ws()` route helper | 14 §2.6 | WebSocket routes alongside HTTP routes |
+| 14.7 | Heartbeat ping/pong (30s interval) | 14 §2.7 | Dead connection detection |
+| 14.8 | Auth support via plug pipeline | 14 §2.8 | Assigns available in channels |
+| 14.9 | Tests with HummingbirdWSTesting | 14 §3 | Channel test suite |
+
+**Exit criteria:** A chat channel broadcasts messages to all connected clients. Auth works via the plug pipeline.
+
+---
+
+## Sprint 15: CORS Support
+
+**Goal:** APIs callable from browser JavaScript on different origins.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 15.1 | `cors()` plug with configurable origin policy | 15 §2.1 | Plug function |
+| 15.2 | `CORSOrigin` enum: `.originBased`, `.exact`, `.allowList`, `.any`, `.custom` | 15 §2.2 | Origin modes |
+| 15.3 | Preflight `OPTIONS` handling (204, CORS headers, halt) | 15 §2.3 | Preflight response |
+| 15.4 | Actual request header injection | 15 §2.4 | `Access-Control-Allow-Origin` on responses |
+| 15.5 | Credentials, expose headers, max-age support | 15 §2.1 | Full CORS spec |
+| 15.6 | Environment-aware defaults (permissive in dev) | 15 §2.6 | Prod warning for `*` |
+| 15.7 | Tests: preflight, actual, credentials, origin validation | 15 §3 | Test suite |
+
+**Exit criteria:** `cors(allowOrigin: .exact("https://myapp.com"))` handles preflight and sets headers correctly.
+
+---
+
+## Sprint 16: Rate Limiting
+
+**Goal:** Protect endpoints from abuse with per-client request limits.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 16.1 | `rateLimit()` plug with sliding window counter | 16 §2.1 | Plug function |
+| 16.2 | `RateLimitKey`: `.ip`, `.header`, `.assign`, `.custom` | 16 §2.2 | Client identification |
+| 16.3 | Rate limit headers on all responses | 16 §2.4 | `X-RateLimit-*` headers |
+| 16.4 | 429 response with `Retry-After` and content negotiation | 16 §2.5 | JSON or plain text |
+| 16.5 | IP extraction from `X-Forwarded-For` / `X-Real-IP` | 16 §2.7 | Proxy support |
+| 16.6 | Actor-based store with auto-cleanup | 16 §2.6 | Memory management |
+| 16.7 | Tests: limit enforcement, headers, key modes, expiry | 16 §3 | Test suite |
+
+**Exit criteria:** `rateLimit(max: 100, windowSeconds: 60)` returns 429 after 100 requests per IP per minute.
+
+---
+
+## Sprint 17: HTTP/2, TLS, and Compression
+
+**Goal:** Production transport: HTTPS, HTTP/2 multiplexing, gzip responses.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 17.1 | `ServerConfig` extension for TLS and HTTP/2 | 17 §2.1 | Certificate + key paths |
+| 17.2 | HTTP/2 via ALPN when TLS is set | 17 §2.2 | Multiplexed connections |
+| 17.3 | `peregrine server --tls` self-signed cert for dev | 17 §2.3 | Local HTTPS |
+| 17.4 | `httpsRedirect()` plug | 17 §2.4 | HTTP → HTTPS redirect |
+| 17.5 | `compress()` plug with gzip/deflate | 17 §2.5 | Response compression |
+| 17.6 | Accept-Encoding negotiation | 17 §2.6 | Prefer gzip, fallback deflate |
+| 17.7 | Skip compression for small/binary/already-compressed responses | 17 §2.8 | Smart exclusions |
+| 17.8 | Tests: compression, TLS config, redirect | 17 §3 | Test suite |
+
+**Exit criteria:** HTTPS works with real certs. `compress()` gzips text responses. HTTP/2 negotiates via ALPN.
+
+---
+
+## Sprint 18: Metrics and Distributed Tracing
+
+**Goal:** Observability: know what your app is doing, how fast, and where it fails.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 18.1 | `metrics()` plug using swift-metrics | 18 §2.1 | Request counters, histograms, gauges |
+| 18.2 | Dev metrics endpoint `/_peregrine/metrics` | 18 §2.2 | JSON stats in dev mode |
+| 18.3 | Upgrade `requestLogger()` with swift-log + structured metadata | 18 §2.4 | Request ID, status, duration |
+| 18.4 | Log level by status (info/warning/error) | 18 §2.5 | Smart log levels |
+| 18.5 | `tracing()` plug using swift-distributed-tracing | 18 §2.6 | Spans per request |
+| 18.6 | W3C trace context propagation | 18 §2.6 | `traceparent` / `tracestate` |
+| 18.7 | Tests: metrics recording, log output, trace spans | 18 §3 | Test suite |
+
+**Exit criteria:** `metrics()` records request data compatible with any swift-metrics backend. Dev dashboard shows live stats.
+
+---
+
+## Sprint 19: Server-Side Sessions
+
+**Goal:** Store session data on the server. Cookie carries only the session ID.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 19.1 | `SessionStore` protocol | 19 §2.1 | `get`, `set`, `delete`, `cleanup` |
+| 19.2 | `MemorySessionStore` with TTL | 19 §2.2 | Dev/test default |
+| 19.3 | `PostgresSessionStore` via Spectro | 19 §2.2 | Production store |
+| 19.4 | `session(store:)` plug with cookie management | 19 §2.3 | Read/write session ID cookie |
+| 19.5 | `conn.getSession`, `putSession`, `deleteSession`, `clearSession` | 19 §2.4 | Session API |
+| 19.6 | `conn.renewSession` for fixation protection | 19 §2.5 | New ID, same data |
+| 19.7 | Auto-created `peregrine_sessions` table | 19 §2.7 | Zero-config setup |
+| 19.8 | Expired session cleanup (probabilistic + CLI) | 19 §2.6 | Memory management |
+| 19.9 | Tests: write/read across requests, expiry, renewal | 19 §3 | Test suite |
+
+**Exit criteria:** `session(store: .postgres)` stores session data in Postgres. Only the session ID travels in the cookie.
+
+---
+
+## Sprint 20: Mailer
+
+**Goal:** Send emails from the app. ESW templates for email bodies.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 20.1 | `Email` struct and `PeregrineEmail` protocol | 20 §2.1-2.2 | Type-safe email definitions |
+| 20.2 | `MailDelivery` protocol | 20 §2.3 | Pluggable backends |
+| 20.3 | `LoggerDelivery` for dev (prints to console) | 20 §2.3 | Dev default |
+| 20.4 | `SMTPDelivery` with STARTTLS | 20 §2.3 | Production delivery |
+| 20.5 | `TestDelivery` for assertions | 20 §2.3 | Collect sent emails |
+| 20.6 | `Mailer.deliver` facade with env-aware defaults | 20 §2.4 | Logger in dev, explicit in prod |
+| 20.7 | SMTP config from env vars | 20 §2.5 | `SMTP_HOST`, etc. |
+| 20.8 | `peregrine gen.email` generator | 20 §2.6 | Email struct + ESW templates |
+| 20.9 | Tests: delivery, SMTP handshake, test collector | 20 §3 | Test suite |
+
+**Exit criteria:** `Mailer.deliver(WelcomeEmail(user: user))` sends an email with an ESW-rendered body.
+
+---
+
+## Sprint 21: Background Jobs
+
+**Goal:** Async task processing outside the request cycle. Postgres-backed queue.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 21.1 | `PeregrineJob` protocol (Codable, Sendable) | 21 §2.1 | Type-safe job definitions |
+| 21.2 | `Jobs.enqueue` with immediate and delayed scheduling | 21 §2.2 | Enqueue API |
+| 21.3 | Postgres job store with auto-created table | 21 §2.3 | `peregrine_jobs` table |
+| 21.4 | In-memory job store for dev/test | 21 §2.3 | No DB required in dev |
+| 21.5 | `JobWorker` actor with polling and row locking | 21 §2.4 | Concurrent job execution |
+| 21.6 | Exponential backoff retries | 21 §2.5 | 15s, 1m, 4m, 16m, 1h |
+| 21.7 | `PeregrineApp.jobs` registration | 21 §2.6 | Auto-start worker on boot |
+| 21.8 | `peregrine jobs:work`, `jobs:status`, `jobs:retry-failed` CLI | 21 §2.7 | Job management |
+| 21.9 | Test store with `drainAll()` | 21 §2.8 | Synchronous test execution |
+| 21.10 | Tests: enqueue, execute, retry, failure, scheduling | 21 §3 | Test suite |
+
+**Exit criteria:** `Jobs.enqueue(SendEmailJob(userId: id))` persists the job. Worker picks it up, executes, retries on failure.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -302,12 +456,35 @@ Sprint 1 (bootstrap)
               │
         Sprint 11
     (deploy + tokens)
+              │
+    ══════════╧══════════════ 1.0 RELEASE ════════════════
+              │
+    ┌─────────┼─────────┬──────────┬──────────┐
+    │         │         │          │          │
+  Sp 14    Sp 15     Sp 16     Sp 17      Sp 18
+  (ws)     (cors)    (rate)    (http2)    (metrics)
+    │         │         │          │          │
+    │         └────┬────┘          │          │
+    │              │               │          │
+    │           Sp 19 ◄────────────┘          │
+    │        (sessions)                       │
+    │              │                          │
+    │         ┌────┴────┐                     │
+    │         │         │                     │
+    │       Sp 20     Sp 21 ◄─────────────────┘
+    │      (mailer)   (jobs)
+    │         │         │
+    │         └────┬────┘
+    │              │
+    └──────────────┘
+           │
+    ═══════╧══════════════ 2.0 RELEASE ════════════════
 ```
 
-Sprints 7–9 can run in parallel. Sprint 12 depends on 9 (static files).
-Sprint 10 depends on 8 (CSRF) and 12 (styled templates).
-Sprint 13 depends on 12 (build command).
-Sprint 11 can start after 10 or in parallel.
+Sprints 14–18 can all run in parallel (no interdependencies).
+Sprint 19 (sessions) benefits from 17 (TLS for secure cookies).
+Sprint 20 (mailer) and 21 (jobs) can run in parallel.
+Sprint 21 benefits from 18 (metrics for job monitoring).
 
 ---
 
@@ -329,3 +506,12 @@ Sprint 11 can start after 10 or in parallel.
 | 11 | Production | Dockerfile generation, signed tokens |
 | 12 | Asset pipeline | Pico CSS default, Tailwind opt-in, `peregrine build` |
 | 13 | Dev server | `peregrine build --watch` with auto-rebuild |
+| | | **── 1.0 ──** |
+| 14 | WebSockets | `PeregrineChannel` with broadcast and topics |
+| 15 | CORS | `cors()` plug with origin policies |
+| 16 | Rate limiting | `rateLimit()` plug with sliding window |
+| 17 | HTTP/2 + TLS + compression | HTTPS, multiplexing, gzip responses |
+| 18 | Metrics + tracing | swift-metrics, swift-log, distributed tracing |
+| 19 | Server-side sessions | Postgres-backed session store |
+| 20 | Mailer | SMTP delivery with ESW email templates |
+| 21 | Background jobs | Postgres-backed job queue with retries |
