@@ -133,6 +133,99 @@
 
 ---
 
+## Sprint 7: Flash Messages
+
+**Goal:** Write-once, read-once messages that survive exactly one redirect.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 7.1 | `flashPlug()` — reads from session, clears after read | 07 §2.1 | Plug function |
+| 7.2 | `conn.putFlash(.info, "msg")` helper | 07 §2.2 | Connection extension |
+| 7.3 | `conn.flash` accessor with `.info`, `.error`, `.warning` | 07 §2.2 | `Flash` struct |
+| 7.4 | Session storage as JSON under `_flash` key | 07 §2.3 | Serialize/deserialize |
+| 7.5 | Template integration — flash available in assigns | 07 §2.4 | Auto-injected |
+| 7.6 | Tests: survives redirect, displays once, multiple levels | 07 §3 | Test suite |
+
+**Exit criteria:** `putFlash(.info, "Created!")` in a POST handler displays the message once after redirect, then it's gone.
+
+---
+
+## Sprint 8: CSRF Protection
+
+**Goal:** State-changing requests are protected from cross-site forgery by default.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 8.1 | `csrfProtection()` plug with token generation | 08 §2.1 | Plug function |
+| 8.2 | Token validation on POST/PUT/PATCH/DELETE | 08 §2.1 | 403 on mismatch |
+| 8.3 | Skip validation for JSON requests | 08 §2.1 | Content-Type check |
+| 8.4 | `csrfToken` injected into assigns for templates | 08 §2.2 | Template helper |
+| 8.5 | `except:` parameter to skip specific paths | 08 §2.1 | Webhook support |
+| 8.6 | Token read from `_csrf_token` param or `x-csrf-token` header | 08 §2.1 | Dual source |
+| 8.7 | Tests: valid token passes, missing rejects, JSON skips | 08 §3 | Test suite |
+
+**Exit criteria:** HTML form submissions without a valid CSRF token get 403. JSON API requests are unaffected.
+
+---
+
+## Sprint 9: Static File Serving
+
+**Goal:** Drop files in `Public/`, they're served. No configuration.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 9.1 | `staticFiles()` plug serving from `Public/` | 09 §2.1 | Plug function |
+| 9.2 | MIME type detection from file extension | 09 §2.3 | Content-Type mapping |
+| 9.3 | Path traversal prevention (`..` rejection) | 09 §2.4 | Security check |
+| 9.4 | Hidden file protection (no `.env` serving) | 09 §2.4 | Dot-file skip |
+| 9.5 | Environment-aware cache headers | 09 §2.5 | `no-cache` in dev, `max-age` in prod |
+| 9.6 | Update `peregrine new` to create `Public/` directory | 09 §2.6 | CLI update |
+| 9.7 | Tests: serves files, rejects traversal, correct MIME types | 09 §3 | Test suite |
+
+**Exit criteria:** CSS/JS/images in `Public/` are served with correct content types and cache headers.
+
+---
+
+## Sprint 10: Authentication Generator
+
+**Goal:** `peregrine gen.auth` generates a complete, working auth system.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 10.1 | User and UserToken model templates | 10 §2.1-2.2 | Generated Swift models |
+| 10.2 | SQL migrations with indexes | 10 §2.3 | Generated SQL |
+| 10.3 | Password hashing with bcrypt | 10 §2.5 | `Auth.hashPassword` / `verifyPassword` |
+| 10.4 | Auth routes: register, login, logout | 10 §2.4 | Generated route file |
+| 10.5 | `requireAuth()` plug | 10 §2.6 | Middleware plug |
+| 10.6 | Session token flow (create, verify, delete) | 10 §2.7 | Token lifecycle |
+| 10.7 | Login and register ESW templates | 10 §2.8 | Generated templates |
+| 10.8 | Validation: email uniqueness, password length | 10 §2.9 | Input validation |
+| 10.9 | `peregrine gen.auth` CLI command wiring | 10 §2 | CLI integration |
+| 10.10 | Tests: register, login, logout, requireAuth | 10 §3 | Test suite |
+
+**Exit criteria:** `peregrine gen.auth && swift build` produces a working registration and login system.
+
+---
+
+## Sprint 11: Deployment Tooling & Token Signing
+
+**Goal:** Production-ready with `peregrine gen.dockerfile` and `PeregrineToken` for signed URLs.
+
+| # | Task | Spec | Deliverable |
+|---|------|------|-------------|
+| 11.1 | `peregrine gen.dockerfile` command | 11 §2.1 | Generates Dockerfile + .dockerignore |
+| 11.2 | Multi-stage Dockerfile with layer caching | 11 §2.2 | Optimized build |
+| 11.3 | `.dockerignore` generation | 11 §2.3 | Exclude build artifacts |
+| 11.4 | `PeregrineToken.sign` with HMAC-SHA256 | 11 §2.5 | Token creation |
+| 11.5 | `PeregrineToken.verify` with expiry support | 11 §2.5 | Token validation |
+| 11.6 | URL-safe token format (base64url) | 11 §2.6 | Compact tokens |
+| 11.7 | `PEREGRINE_SECRET` convention | 11 §2.8 | Env var convention |
+| 11.8 | Tests: sign/verify, expiry, tamper detection | 11 §3 | Test suite |
+
+**Exit criteria:** `docker build -t myapp . && docker run -p 8080:8080 myapp` works. Tokens can be signed, verified, and expire correctly.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -147,11 +240,25 @@ Sprint 1 (bootstrap)
     └── Sprint 4 (CLI scaffolding)
             │
             └── Sprint 5 (CLI generators)
-
+                    │
                     All ──→ Sprint 6 (DonutShop migration)
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+        Sprint 7        Sprint 8        Sprint 9
+       (flash msgs)    (CSRF)         (static files)
+              │               │               │
+              └───────┬───────┘               │
+                      │                       │
+                Sprint 10 ◄───────────────────┘
+               (gen.auth)
+                      │
+                Sprint 11
+            (deploy + tokens)
 ```
 
-Sprints 2–3 and 4–5 can run in parallel tracks once Sprint 1 is done.
+Sprints 7–9 can run in parallel. Sprint 10 depends on 8 (CSRF) and 9 (templates need static CSS).
+Sprint 11 can start after 10 or in parallel with late Sprint 10 tasks.
 
 ---
 
@@ -166,3 +273,8 @@ Sprints 2–3 and 4–5 can run in parallel tracks once Sprint 1 is done.
 | 4 | CLI: new | `peregrine new` generates runnable project |
 | 5 | CLI: gen | `gen.schema`, `gen.json`, `gen.html`, `migrate` |
 | 6 | Proof | DonutShop migrated, framework validated |
+| 7 | Flash messages | Write-once read-once messages across redirects |
+| 8 | CSRF protection | Automatic form token validation |
+| 9 | Static files | Serve CSS/JS/images from `Public/` |
+| 10 | Auth generator | `peregrine gen.auth` — register, login, logout |
+| 11 | Production | Dockerfile generation, signed tokens |
