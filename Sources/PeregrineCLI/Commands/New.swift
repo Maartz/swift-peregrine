@@ -91,6 +91,23 @@ struct New: AsyncParsableCommand {
             content: ""
         )
 
+        // Public/ directory structure for static file serving
+        try FileCreator.create(
+            at: "Public/css/.gitkeep",
+            in: projectDir,
+            content: ""
+        )
+        try FileCreator.create(
+            at: "Public/js/.gitkeep",
+            in: projectDir,
+            content: ""
+        )
+        try FileCreator.create(
+            at: "Public/images/.gitkeep",
+            in: projectDir,
+            content: ""
+        )
+
         // .gitignore
         try FileCreator.create(
             at: ".gitignore",

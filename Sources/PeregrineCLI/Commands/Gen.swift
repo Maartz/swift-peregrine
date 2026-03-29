@@ -8,6 +8,7 @@ struct Gen: AsyncParsableCommand {
             GenSchema.self,
             GenJSON.self,
             GenHTML.self,
+            GenAuth.self,
         ]
     )
 }

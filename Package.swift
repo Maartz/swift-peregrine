@@ -58,7 +58,11 @@ let package = Package(
         ),
         .testTarget(
             name: "PeregrineTests",
-            dependencies: ["Peregrine", "PeregrineTest"]
+            dependencies: [
+                "Peregrine",
+                "PeregrineTest",
+                .product(name: "NexusTest", package: "Nexus"),
+            ]
         ),
     ]
 )
