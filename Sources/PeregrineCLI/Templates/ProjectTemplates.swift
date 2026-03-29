@@ -5,8 +5,8 @@ enum ProjectTemplates {
     // MARK: - Package.swift
 
     static func packageSwift(appName: String, includeDB: Bool, includeESW: Bool) -> String {
-        let deps = """
-                .package(url: "https://github.com/Maartz/swift-peregrine", from: "0.1.0"),
+        var deps = """
+                .package(url: "https://github.com/Maartz/swift-peregrine", from: "1.0.0"),
         """
 
         let targetDeps = """
@@ -17,9 +17,22 @@ enum ProjectTemplates {
                     .product(name: "PeregrineTest", package: "swift-peregrine"),
         """
 
-        // These are always pulled in transitively via Peregrine, but
-        // we keep the dependency list clean for the consumer.
-        _ = (deps, targetDeps, testDeps)
+        // ESW plugin requires a direct dependency — SPM does not allow
+        // referencing build-tool plugins from transitive dependencies.
+        var eswPlugins = ""
+        if includeESW {
+            deps += """
+
+                    .package(url: "https://github.com/Spectro-ORM/ESW.git", from: "1.0.0"),
+            """
+            eswPlugins = """
+                        plugins: [
+                            .plugin(name: "ESWBuildPlugin", package: "ESW"),
+                        ]
+            """
+        }
+
+        let pluginsBlock = eswPlugins.isEmpty ? "" : "\n\(eswPlugins)"
 
         return """
         // swift-tools-version: 6.0
@@ -39,7 +52,7 @@ enum ProjectTemplates {
                     name: "\(appName)",
                     dependencies: [
         \(targetDeps)
-                    ]
+                    ]\(pluginsBlock)
                 ),
                 .testTarget(
                     name: "\(appName)Tests",
