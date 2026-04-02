@@ -16,6 +16,27 @@ import Spectro
 ///     #expect(response.status == .ok)
 /// }
 /// ```
+// MARK: - Shared channel registry per App type
+
+/// Thread-safe storage for per-App.Type channel registries.
+/// Allows multiple `TestApp<ChatApp>` instances to share the same `ChannelRegistry`
+/// so sockets from different instances can exchange broadcasts.
+private enum SharedChannelRegistry {
+    nonisolated(unsafe) static var lock = NSLock()
+    nonisolated(unsafe) static var registries: [ObjectIdentifier: ChannelRegistry] = [:]
+
+    static func registry(for typeID: ObjectIdentifier, router: ChannelRouter) -> ChannelRegistry {
+        lock.withLock {
+            if let existing = registries[typeID] { return existing }
+            let r = ChannelRegistry(router: router)
+            registries[typeID] = r
+            return r
+        }
+    }
+}
+
+// MARK: - TestApp
+
 public struct TestApp<App: PeregrineApp>: Sendable {
 
     private let plug: Plug
@@ -24,22 +45,40 @@ public struct TestApp<App: PeregrineApp>: Sendable {
     /// Use this in tests to subscribe or broadcast directly.
     public let pubSub: (any PeregrinePubSub)?
 
+    /// The channel registry shared across all `TestApp<App>` instances.
+    /// Use `app.channels.broadcast(topic:event:payload:)` to push server-initiated events.
+    public let channels: ChannelRegistry
+
+    /// Socket assigns injected into every `ChannelSocket` created via `connectSocket`.
+    public let socketAssigns: SocketAssigns
+
+    /// The channel router from the app (for creating `TestChannelSocket` instances).
+    private let channelRouter: ChannelRouter
+
     /// Creates a test harness for the given app type.
     ///
     /// Builds the same pipeline as `main()` but skips server boot.
-    /// Pass `database` to override the app's database configuration,
-    /// or `nil` to run without a database.
     ///
     /// - Parameters:
     ///   - type: The `PeregrineApp` type to test.
-    ///   - database: Override database config. Pass `.some(nil)` for no DB,
-    ///     or omit to use the app's default.
-    public init(_ type: App.Type, database: Database?? = nil) async throws {
+    ///   - database: Override database config. Pass `.some(nil)` for no DB, or omit to use the app's default.
+    ///   - assigns: Socket assigns to inject into every socket created via `connectSocket(_:)`.
+    public init(_ type: App.Type, database: Database?? = nil, assigns: SocketAssigns = [:]) async throws {
         let app = App()
 
         // PubSub setup (call once to get a stable shared instance)
         let pubSubAdapter = app.pubSub
         self.pubSub = pubSubAdapter
+
+        // Channel setup — shared registry per App.Type so cross-instance broadcasts work
+        let router = app.channels
+        let registry = SharedChannelRegistry.registry(
+            for: ObjectIdentifier(App.self),
+            router: router
+        )
+        self.channels = registry
+        self.channelRouter = router
+        self.socketAssigns = assigns
 
         // Database setup
         var spectro: SpectroClient?
@@ -57,11 +96,17 @@ public struct TestApp<App: PeregrineApp>: Sendable {
         }
 
         // Build router
-        let router = Router { app.routes }
-        let routerPlug: Plug = { conn in try await router(conn) }
+        let httpRouter = Router { app.routes }
+        let routerPlug: Plug = { conn in try await httpRouter(conn) }
 
         // Build pipeline: user plugs → router
         var allPlugs = app.plugs
+
+        // Inject ChannelRegistry into pipeline
+        let channelPlug: Plug = { conn in
+            conn.assign(ChannelRegistryKey.self, value: registry)
+        }
+        allPlugs.insert(channelPlug, at: 0)
 
         if let adapter = pubSubAdapter {
             let pubSubPlug: Plug = { conn in
@@ -82,6 +127,17 @@ public struct TestApp<App: PeregrineApp>: Sendable {
             pipeline(allPlugs),
             customErrorPage: app.customErrorPage
         )
+    }
+
+    // MARK: - Channel Methods
+
+    /// Creates an in-process channel socket connected to the given path.
+    ///
+    /// The socket is pre-loaded with the `assigns` provided at `TestApp` init time.
+    /// Use the returned `TestChannelSocket` to join topics, push events, and receive broadcasts.
+    public func connectSocket(_ path: String) async throws -> TestChannelSocket {
+        let socket = ChannelSocket(assigns: socketAssigns, registry: channels)
+        return TestChannelSocket(socket: socket, registry: channels, router: channelRouter)
     }
 
     // MARK: - Request Methods

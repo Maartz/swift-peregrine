@@ -17,6 +17,15 @@ public protocol PeregrineApp {
     /// Default: `nil`. Override to use `PubSub.inMemory()` or `PubSub.valkey(url:)`.
     var pubSub: (any PeregrinePubSub)? { get }
 
+    /// Channel router. Map topic patterns to `Channel` handler types.
+    /// Default: empty router (no channels configured).
+    var channels: ChannelRouter { get }
+
+    /// Called once on WebSocket upgrade to authenticate the socket.
+    /// Return assigns (e.g. `["userID": id]`) to attach to the socket, or throw to reject.
+    /// Default: returns empty assigns (no authentication).
+    func authenticateSocket(_ conn: Connection) async throws -> SocketAssigns
+
     /// Middleware pipeline applied to every request.
     /// Default: `[requestId(), requestLogger()]`.
     var plugs: [Plug] { get }
@@ -58,6 +67,10 @@ extension PeregrineApp {
 
     public var pubSub: (any PeregrinePubSub)? { nil }
 
+    public var channels: ChannelRouter { ChannelRouter() }
+
+    public func authenticateSocket(_ conn: Connection) async throws -> SocketAssigns { [:] }
+
     public var plugs: [Plug] {
         [requestId(), requestLogger()]
     }
@@ -82,6 +95,9 @@ extension PeregrineApp {
 
         // PubSub setup (call once to get a stable shared instance)
         let pubSubAdapter = app.pubSub
+
+        // Channel setup
+        let channelRegistry = ChannelRegistry(router: app.channels)
 
         // Database setup
         var spectro: SpectroClient?
@@ -111,6 +127,12 @@ extension PeregrineApp {
             }
             allPlugs.insert(pubSubPlug, at: 0)
         }
+
+        // Inject ChannelRegistry into pipeline
+        let channelPlug: Plug = { conn in
+            conn.assign(ChannelRegistryKey.self, value: channelRegistry)
+        }
+        allPlugs.insert(channelPlug, at: 0)
 
         // Inject database into pipeline if configured
         if let client = spectro {
