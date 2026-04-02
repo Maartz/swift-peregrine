@@ -13,6 +13,10 @@ public protocol PeregrineApp {
     /// Database configuration. Return `nil` for apps without a database.
     var database: Database? { get }
 
+    /// PubSub adapter. Return `nil` for apps that don't need pub/sub.
+    /// Default: `nil`. Override to use `PubSub.inMemory()` or `PubSub.valkey(url:)`.
+    var pubSub: (any PeregrinePubSub)? { get }
+
     /// Middleware pipeline applied to every request.
     /// Default: `[requestId(), requestLogger()]`.
     var plugs: [Plug] { get }
@@ -52,6 +56,8 @@ public protocol PeregrineApp {
 extension PeregrineApp {
     public var database: Database? { nil }
 
+    public var pubSub: (any PeregrinePubSub)? { nil }
+
     public var plugs: [Plug] {
         [requestId(), requestLogger()]
     }
@@ -74,6 +80,9 @@ extension PeregrineApp {
         let app = Self()
         app.configure(for: Peregrine.env)
 
+        // PubSub setup (call once to get a stable shared instance)
+        let pubSubAdapter = app.pubSub
+
         // Database setup
         var spectro: SpectroClient?
         if let dbConfig = app.database {
@@ -94,6 +103,14 @@ extension PeregrineApp {
 
         // Build pipeline: user plugs → rescue(router)
         var allPlugs = app.plugs
+
+        // Inject PubSub into pipeline if configured
+        if let adapter = pubSubAdapter {
+            let pubSubPlug: Plug = { conn in
+                conn.assign(PubSubKey.self, value: adapter)
+            }
+            allPlugs.insert(pubSubPlug, at: 0)
+        }
 
         // Inject database into pipeline if configured
         if let client = spectro {

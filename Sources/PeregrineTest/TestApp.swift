@@ -20,6 +20,10 @@ public struct TestApp<App: PeregrineApp>: Sendable {
 
     private let plug: Plug
 
+    /// The PubSub adapter injected into the pipeline, if configured.
+    /// Use this in tests to subscribe or broadcast directly.
+    public let pubSub: (any PeregrinePubSub)?
+
     /// Creates a test harness for the given app type.
     ///
     /// Builds the same pipeline as `main()` but skips server boot.
@@ -32,6 +36,10 @@ public struct TestApp<App: PeregrineApp>: Sendable {
     ///     or omit to use the app's default.
     public init(_ type: App.Type, database: Database?? = nil) async throws {
         let app = App()
+
+        // PubSub setup (call once to get a stable shared instance)
+        let pubSubAdapter = app.pubSub
+        self.pubSub = pubSubAdapter
 
         // Database setup
         var spectro: SpectroClient?
@@ -54,6 +62,13 @@ public struct TestApp<App: PeregrineApp>: Sendable {
 
         // Build pipeline: user plugs → router
         var allPlugs = app.plugs
+
+        if let adapter = pubSubAdapter {
+            let pubSubPlug: Plug = { conn in
+                conn.assign(PubSubKey.self, value: adapter)
+            }
+            allPlugs.insert(pubSubPlug, at: 0)
+        }
 
         if let client = spectro {
             let spectroPlug: Plug = { conn in
