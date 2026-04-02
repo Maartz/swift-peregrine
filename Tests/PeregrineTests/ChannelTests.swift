@@ -40,7 +40,9 @@ private struct RoomChannel: Channel {
     }
 
     func leave(topic: String, payload: ChannelPayload, socket: ChannelSocket) async {
-        await Presence.untrack(socket, topic: topic)
+        if let userID = socket.assigns["userID"] as? UUID {
+            await Presence.untrack(socket, topic: topic, key: userID.uuidString)
+        }
     }
 
     func intercept(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload {

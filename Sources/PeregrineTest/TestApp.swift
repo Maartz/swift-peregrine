@@ -16,6 +16,23 @@ import Spectro
 ///     #expect(response.status == .ok)
 /// }
 /// ```
+// MARK: - PresenceAccessor
+
+/// Provides access to the presence list for a given `ChannelRegistry`.
+/// Obtained via `TestApp.presence`.
+public struct PresenceAccessor: Sendable {
+    private let registry: ChannelRegistry
+
+    init(registry: ChannelRegistry) {
+        self.registry = registry
+    }
+
+    /// Returns the current presence list for the given topic, sorted by `online_at`.
+    public func list(_ topic: String) async -> [PresenceEntry] {
+        registry.listPresence(topic: topic)
+    }
+}
+
 // MARK: - Shared channel registry per App type
 
 /// Thread-safe storage for per-App.Type channel registries.
@@ -48,6 +65,9 @@ public struct TestApp<App: PeregrineApp>: Sendable {
     /// The channel registry shared across all `TestApp<App>` instances.
     /// Use `app.channels.broadcast(topic:event:payload:)` to push server-initiated events.
     public let channels: ChannelRegistry
+
+    /// Provides access to the presence list for this app's channel registry.
+    public var presence: PresenceAccessor { PresenceAccessor(registry: channels) }
 
     /// Socket assigns injected into every `ChannelSocket` created via `connectSocket`.
     public let socketAssigns: SocketAssigns

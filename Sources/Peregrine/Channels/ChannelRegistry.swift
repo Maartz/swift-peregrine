@@ -6,12 +6,20 @@ import Foundation
 /// are synchronous — allowing `TestChannelSocket.deinit` to clean up without `await`.
 public final class ChannelRegistry: @unchecked Sendable {
 
+    // MARK: - Types
+
+    private struct PresenceMeta {
+        let socketID: UUID
+        let meta: ChannelPayload
+    }
+
     // MARK: - State
 
     public var router: ChannelRouter
     private let lock = NSLock()
     private var sockets: [String: [UUID: ChannelSocket]] = [:]
-    private var presenceState: [String: [String: ChannelPayload]] = [:]
+    /// topic → key → [PresenceMeta] — supports multiple metas per key (multi-tab)
+    private var presenceState: [String: [String: [PresenceMeta]]] = [:]
 
     // MARK: - Init
 
@@ -39,21 +47,61 @@ public final class ChannelRegistry: @unchecked Sendable {
 
     // MARK: - Presence (synchronous)
 
+    /// Adds a meta entry for `key` under `topic` (multi-tab: appends if key already exists).
     public func trackPresence(socketID: UUID, topic: String, key: String, meta: ChannelPayload) {
         lock.withLock {
             if presenceState[topic] == nil { presenceState[topic] = [:] }
-            presenceState[topic]![key] = meta
+            if presenceState[topic]![key] == nil { presenceState[topic]![key] = [] }
+            presenceState[topic]![key]!.append(PresenceMeta(socketID: socketID, meta: meta))
         }
     }
 
-    public func untrackPresence(topic: String, key: String) {
-        _ = lock.withLock {
-            presenceState[topic]?.removeValue(forKey: key)
+    /// Removes the specific socketID's meta for `key` under `topic`.
+    /// Removes the key entirely when all metas are gone.
+    public func untrackPresence(socketID: UUID, topic: String, key: String) {
+        lock.withLock {
+            presenceState[topic]?[key]?.removeAll { $0.socketID == socketID }
+            if presenceState[topic]?[key]?.isEmpty == true {
+                presenceState[topic]?.removeValue(forKey: key)
+            }
         }
     }
 
-    public func listPresence(topic: String) -> [String: ChannelPayload] {
-        lock.withLock { presenceState[topic] ?? [:] }
+    /// Removes ALL presence entries for `socketID` across all keys in `topic`.
+    /// Used by `TestChannelSocket.deinit` for connection-drop cleanup.
+    public func untrackAllPresence(socketID: UUID, topic: String) {
+        lock.withLock {
+            for key in presenceState[topic]?.keys ?? [:].keys {
+                presenceState[topic]?[key]?.removeAll { $0.socketID == socketID }
+            }
+            // Remove empty keys
+            presenceState[topic]?.keys.forEach { key in
+                if presenceState[topic]?[key]?.isEmpty == true {
+                    presenceState[topic]?.removeValue(forKey: key)
+                }
+            }
+        }
+    }
+
+    /// Returns the meta for a specific socketID+key (used by Presence.untrack for diff payload).
+    public func presenceMeta(socketID: UUID, topic: String, key: String) -> ChannelPayload? {
+        lock.withLock {
+            presenceState[topic]?[key]?.first { $0.socketID == socketID }?.meta
+        }
+    }
+
+    /// Returns the sorted presence list for a topic.
+    public func listPresence(topic: String) -> [PresenceEntry] {
+        let state = lock.withLock { presenceState[topic] ?? [:] }
+        let entries = state.map { (key, metas) in
+            PresenceEntry(key: key, metas: metas.map { $0.meta })
+        }
+        // Sort by earliest online_at across all metas for stable ordering
+        return entries.sorted { a, b in
+            let aTime = a.metas.compactMap { $0["online_at"] as? Double }.min() ?? 0
+            let bTime = b.metas.compactMap { $0["online_at"] as? Double }.min() ?? 0
+            return aTime < bTime
+        }
     }
 
     // MARK: - Broadcast (internal — from ChannelSocket)

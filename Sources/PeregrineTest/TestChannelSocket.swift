@@ -56,6 +56,7 @@ public final class TestChannelSocket: @unchecked Sendable {
         // Synchronous cleanup — ChannelRegistry uses NSLock, not an actor
         for topic in joinedTopics {
             registry.unregister(socket, topic: topic)
+            registry.untrackAllPresence(socketID: socket.id, topic: topic)
         }
     }
 
