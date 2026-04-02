@@ -176,7 +176,95 @@ public struct TestApp<App: PeregrineApp>: Sendable {
         return TestChannelSocket(socket: socket, registry: channels, router: channelRouter)
     }
 
+    // MARK: - SSE Methods
+
+    /// Connects to an SSE endpoint, establishes the subscription, then runs `action`,
+    /// and collects `count` events before disconnecting.
+    ///
+    /// Uses the `assigns` injected at `TestApp` init time (e.g. `currentUser`).
+    /// The subscription is **guaranteed to be established before `action` runs** —
+    /// safe to call `broadcaster.publish(...)` inside `action`.
+    ///
+    /// ```swift
+    /// let events = try await app.collectSSE("/live/orders", count: 1) {
+    ///     await MyApp.broadcaster.publish(event)
+    /// }
+    /// ```
+    public func collectSSE(
+        _ path: String,
+        count: Int,
+        timeout: Duration = .seconds(5),
+        then action: @Sendable () async throws -> Void = {}
+    ) async throws -> [ServerSentEvent] {
+        var conn = TestConnection.build(method: .get, path: path, body: .empty, headers: HTTPFields())
+
+        for (key, value) in socketAssigns {
+            conn = conn.assign(key: key, value: value)
+        }
+
+        // Run the route — subscription is established inside the handler.
+        var result = try await plug(conn)
+        result = result.runBeforeSend()
+
+        guard case .stream(let bodyStream) = result.responseBody else {
+            return []
+        }
+
+        // Pipe body stream into an AsyncStream so we can race with a timeout below.
+        let (resultStream, resultContinuation) = AsyncStream<ServerSentEvent>.makeStream()
+        let consumeTask = Task {
+            do {
+                for try await chunk in bodyStream {
+                    if let event = ServerSentEvent.parse(chunk) {
+                        resultContinuation.yield(event)
+                    }
+                }
+            } catch { /* stream ended or task cancelled */ }
+            resultContinuation.finish()
+        }
+
+        // Run caller's action (e.g. publish events) with subscription already set up.
+        do {
+            try await action()
+        } catch {
+            consumeTask.cancel()
+            throw error
+        }
+
+        // Collect up to `count` events, racing against the timeout.
+        let events = try await withThrowingTaskGroup(of: [ServerSentEvent].self) { group in
+            group.addTask {
+                var collected: [ServerSentEvent] = []
+                for await event in resultStream {
+                    collected.append(event)
+                    if collected.count >= count { break }
+                }
+                return collected
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                return []
+            }
+            let collected = (try await group.next()) ?? []
+            group.cancelAll()
+            return collected
+        }
+
+        consumeTask.cancel()
+        return events
+    }
+
     // MARK: - Request Methods
+
+    /// Sends a HEAD request through the pipeline (returns headers, no body).
+    public func head(
+        _ path: String,
+        headers: [String: String] = [:],
+        assigns: [String: any Sendable] = [:],
+        session: [String: String]? = nil
+    ) async throws -> TestResponse {
+        try await request(method: .head, path: path, headers: headers, assigns: assigns, session: session)
+    }
 
     /// Sends a GET request through the pipeline.
     public func get(
