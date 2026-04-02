@@ -21,6 +21,14 @@ public protocol PeregrineApp {
     /// Default: empty router (no channels configured).
     var channels: ChannelRouter { get }
 
+    /// Job queue driver. Return `JobQueue.inMemory()` for tests or `JobQueue.postgres(spectro:)` in production.
+    /// Default: `nil` (no job queue configured).
+    var jobs: (any PeregrineJobQueue)? { get }
+
+    /// Recurring jobs to run on a schedule.
+    /// Default: `[]` (no scheduled jobs).
+    var scheduledJobs: [ScheduledJobEntry] { get }
+
     /// Called once on WebSocket upgrade to authenticate the socket.
     /// Return assigns (e.g. `["userID": id]`) to attach to the socket, or throw to reject.
     /// Default: returns empty assigns (no authentication).
@@ -69,6 +77,10 @@ extension PeregrineApp {
 
     public var channels: ChannelRouter { ChannelRouter() }
 
+    public var jobs: (any PeregrineJobQueue)? { nil }
+
+    public var scheduledJobs: [ScheduledJobEntry] { [] }
+
     public func authenticateSocket(_ conn: Connection) async throws -> SocketAssigns { [:] }
 
     public var plugs: [Plug] {
@@ -98,6 +110,12 @@ extension PeregrineApp {
 
         // Channel setup
         let channelRegistry = ChannelRegistry(router: app.channels)
+
+        // Job queue setup
+        let jobQueueAdapter = app.jobs
+        if let inMemory = jobQueueAdapter as? InMemoryJobQueue {
+            inMemory.registerSchedule(app.scheduledJobs)
+        }
 
         // Database setup
         var spectro: SpectroClient?
@@ -133,6 +151,14 @@ extension PeregrineApp {
             conn.assign(ChannelRegistryKey.self, value: channelRegistry)
         }
         allPlugs.insert(channelPlug, at: 0)
+
+        // Inject job queue into pipeline if configured
+        if let adapter = jobQueueAdapter {
+            let jobsPlug: Plug = { conn in
+                conn.assign(JobQueueKey.self, value: adapter)
+            }
+            allPlugs.insert(jobsPlug, at: 0)
+        }
 
         // Inject database into pipeline if configured
         if let client = spectro {

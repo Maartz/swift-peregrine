@@ -72,6 +72,10 @@ public struct TestApp<App: PeregrineApp>: Sendable {
     /// Socket assigns injected into every `ChannelSocket` created via `connectSocket`.
     public let socketAssigns: SocketAssigns
 
+    /// The in-memory job queue for this test app.
+    /// Use `app.jobs.pending(_:)`, `app.jobs.discarded(_:)`, and `app.jobs.failedAttempts(_:)` to inspect state.
+    public let jobs: InMemoryJobQueue
+
     /// The channel router from the app (for creating `TestChannelSocket` instances).
     private let channelRouter: ChannelRouter
 
@@ -83,7 +87,8 @@ public struct TestApp<App: PeregrineApp>: Sendable {
     ///   - type: The `PeregrineApp` type to test.
     ///   - database: Override database config. Pass `.some(nil)` for no DB, or omit to use the app's default.
     ///   - assigns: Socket assigns to inject into every socket created via `connectSocket(_:)`.
-    public init(_ type: App.Type, database: Database?? = nil, assigns: SocketAssigns = [:]) async throws {
+    ///   - runJobsInline: When `true` (default), jobs execute synchronously inside `push()`. Set to `false` to inspect the queue without executing.
+    public init(_ type: App.Type, database: Database?? = nil, assigns: SocketAssigns = [:], runJobsInline: Bool = true) async throws {
         let app = App()
 
         // PubSub setup (call once to get a stable shared instance)
@@ -99,6 +104,11 @@ public struct TestApp<App: PeregrineApp>: Sendable {
         self.channels = registry
         self.channelRouter = router
         self.socketAssigns = assigns
+
+        // Job queue setup — always use an in-memory queue in tests
+        let jobQueue = InMemoryJobQueue(runInline: runJobsInline)
+        jobQueue.registerSchedule(app.scheduledJobs)
+        self.jobs = jobQueue
 
         // Database setup
         var spectro: SpectroClient?
@@ -127,6 +137,12 @@ public struct TestApp<App: PeregrineApp>: Sendable {
             conn.assign(ChannelRegistryKey.self, value: registry)
         }
         allPlugs.insert(channelPlug, at: 0)
+
+        // Inject job queue into pipeline
+        let jobsPlug: Plug = { conn in
+            conn.assign(JobQueueKey.self, value: jobQueue)
+        }
+        allPlugs.insert(jobsPlug, at: 0)
 
         if let adapter = pubSubAdapter {
             let pubSubPlug: Plug = { conn in
