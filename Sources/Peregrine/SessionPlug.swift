@@ -71,7 +71,7 @@ public func session(
 
         // Inject the store and configuration into assigns
         result = result.assign(SessionCookieNameKey.self, value: cookieName)
-        result = result.assign(SessionPlugStoreKey.self, value: store)
+        result = result.assign(PeregrineSessionKey.self, value: store)
         result = result.assign(SessionTTLKey.self, value: ttl)
         result = result.assign(SessionPendingOpsKey.self, value: SessionPendingOps())
 

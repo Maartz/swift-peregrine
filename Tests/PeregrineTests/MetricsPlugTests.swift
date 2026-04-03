@@ -130,7 +130,7 @@ struct DevMetricsStoreTests {
 
     @Test("devMetricsEndpoint responds to correct path")
     func devMetricsEndpointRespondsToCorrectPath() async throws {
-        var conn = buildConn(method: .get, path: "/_peregrine/metrics")
+        let conn = buildConn(method: .get, path: "/_peregrine/metrics")
         // Run metrics plug first to populate the store
         let plug = metrics()
         _ = try await plug(conn)

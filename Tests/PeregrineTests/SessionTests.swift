@@ -102,7 +102,8 @@ struct SessionTests {
         let afterPlug = try await plug(connWithCookie(sessionID))
 
         let cleared = afterPlug.clearSessionID()
-        try await cleared.flushSession()
+        let sent = cleared.runBeforeSend()
+        try await sent.flushSession()
 
         // Session should be deleted
         let loaded = try await store.get(sessionID)

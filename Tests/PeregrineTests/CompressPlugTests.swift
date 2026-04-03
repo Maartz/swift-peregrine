@@ -11,15 +11,15 @@ struct CompressPlugTests {
 
     @Test("compress returns a Compression struct")
     func compressReturnsCompression() {
-        let compression = compress()
-        // Compression is a Nexus struct; we verify it is returned without error
-        #expect(compression != nil)
+        let _ = compress()
+        // Compression is a Nexus struct; verify it constructs without error
+        #expect(true)
     }
 
     @Test("compress with custom minBytes returns a Compression struct")
     func compressWithCustomMinBytes() {
-        let compression = compress(minBytes: 512)
-        #expect(compression != nil)
+        let _ = compress(minBytes: 512)
+        #expect(true)
     }
 
     @Test("defaultCompressibleTypes includes text/html")
