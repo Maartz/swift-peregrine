@@ -13,6 +13,11 @@ public protocol PeregrineApp {
     /// Database configuration. Return `nil` for apps without a database.
     var database: Database? { get }
 
+    /// Session store for server-side sessions. Return `nil` for apps that
+    /// don't need sessions.
+    /// Default: `nil`. Override to use `MemorySessionStore()` or a custom store.
+    var sessionStore: SessionStore? { get }
+
     /// PubSub adapter. Return `nil` for apps that don't need pub/sub.
     /// Default: `nil`. Override to use `PubSub.inMemory()` or `PubSub.valkey(url:)`.
     var pubSub: (any PeregrinePubSub)? { get }
@@ -73,6 +78,8 @@ public protocol PeregrineApp {
 extension PeregrineApp {
     public var database: Database? { nil }
 
+    public var sessionStore: SessionStore? { nil }
+
     public var pubSub: (any PeregrinePubSub)? { nil }
 
     public var channels: ChannelRouter { ChannelRouter() }
@@ -131,12 +138,32 @@ extension PeregrineApp {
             try await app.willStart(spectro: client)
         }
 
+        // Session setup
+        var sessionPlug: Plug?
+        if let store = app.sessionStore {
+            sessionPlug = session(store: store)
+        }
+
         // Build router
         let router = Router { app.routes }
         let routerPlug: Plug = { conn in try await router(conn) }
 
         // Build pipeline: user plugs → rescue(router)
         var allPlugs = app.plugs
+
+        // Inject database into pipeline if configured (must come before session
+        // when using Postgres-backed sessions)
+        if let client = spectro {
+            let spectroPlug: Plug = { conn in
+                conn.assign(SpectroKey.self, value: client)
+            }
+            allPlugs.insert(spectroPlug, at: 0)
+        }
+
+        // Inject session into pipeline if configured
+        if let plug = sessionPlug {
+            allPlugs.insert(plug, at: 0)
+        }
 
         // Inject PubSub into pipeline if configured
         if let adapter = pubSubAdapter {
@@ -158,14 +185,6 @@ extension PeregrineApp {
                 conn.assign(JobQueueKey.self, value: adapter)
             }
             allPlugs.insert(jobsPlug, at: 0)
-        }
-
-        // Inject database into pipeline if configured
-        if let client = spectro {
-            let spectroPlug: Plug = { conn in
-                conn.assign(SpectroKey.self, value: client)
-            }
-            allPlugs.insert(spectroPlug, at: 0)
         }
 
         allPlugs.append(routerPlug)

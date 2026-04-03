@@ -27,9 +27,21 @@ public struct ScheduledJobEntry: @unchecked Sendable {
 
     let execute: @Sendable (JobContext) async throws -> Void
 
+    /// A type-erased reference to the job's type, for test comparison.
+    public var jobType: Any.Type { _jobType }
+    private let _jobType: Any.Type
+
     /// Returns `true` when this entry corresponds to `type`.
     public func isJob<J: PeregrineJob>(_ type: J.Type) -> Bool {
         jobTypeName == String(describing: J.self)
+    }
+
+    init(jobTypeName: String, cron: String?, interval: Duration?, execute: @Sendable @escaping (JobContext) async throws -> Void, jobType: Any.Type) {
+        self.jobTypeName = jobTypeName
+        self.cron = cron
+        self.interval = interval
+        self.execute = execute
+        self._jobType = jobType
     }
 }
 
@@ -200,7 +212,8 @@ public func schedule<J: PeregrineJob>(
         jobTypeName: String(describing: J.self),
         cron: cron,
         interval: nil,
-        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) }
+        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) },
+        jobType: J.self
     )
 }
 
@@ -214,7 +227,8 @@ public func schedule<J: PeregrineJob>(
         jobTypeName: String(describing: J.self),
         cron: nil,
         interval: interval,
-        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) }
+        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) },
+        jobType: J.self
     )
 }
 

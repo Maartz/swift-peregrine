@@ -220,7 +220,12 @@ enum AuthTemplates {
         /// redirected to the login page.
         ///
         /// ```swift
-        /// scope("/admin", through: [requireAuth()]) {
+        /// // Define once, reuse across multiple scopes:
+        /// let adminPipeline = NamedPipeline {
+        ///     requireAuth()
+        /// }
+        ///
+        /// scope("/admin", through: adminPipeline) {
         ///     adminRoutes()
         /// }
         /// ```
