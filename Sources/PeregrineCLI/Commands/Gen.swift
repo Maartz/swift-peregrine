@@ -5,6 +5,9 @@ struct Gen: AsyncParsableCommand {
         commandName: "gen",
         abstract: "Code generators",
         subcommands: [
+            GenResource.self,
+            GenContext.self,
+            GenMigration.self,
             GenSchema.self,
             GenJSON.self,
             GenHTML.self,

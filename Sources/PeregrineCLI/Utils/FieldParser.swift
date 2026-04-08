@@ -1,31 +1,56 @@
 import Foundation
 
-/// A parsed field from `name:type:modifier` CLI syntax.
+/// A parsed field from `name:type` CLI syntax.
+///
+/// Supports modifiers:
+///   - `?` suffix for optional: `bio:text?`
+///   - `[]` suffix for arrays: `tags:string[]`
+///   - `reference` type for FKs: `post:reference`
+///   - Legacy modifier syntax: `user_id:uuid:references`
 struct ParsedField {
     let name: String
     let type: FieldType
     let isOptional: Bool
     let isReference: Bool
+    let isArray: Bool
 
     /// The Swift property name in camelCase.
+    /// For references without `_id` suffix, appends `Id` (e.g. `post` → `postId`).
     var swiftName: String {
-        toCamelCase(name)
+        let base = toCamelCase(name)
+        if isReference && !name.hasSuffix("_id") && !name.hasSuffix("Id") {
+            return base + "Id"
+        }
+        return base
     }
 
     /// The database column name in snake_case.
+    /// For references without `_id` suffix, appends `_id` (e.g. `post` → `post_id`).
     var columnName: String {
-        toSnakeCase(name)
+        let base = toSnakeCase(name)
+        if isReference && !base.hasSuffix("_id") {
+            return base + "_id"
+        }
+        return base
     }
 
-    /// The Swift type string (e.g. "String", "UUID?").
+    /// The Swift type string (e.g. "String", "UUID?", "[String]").
     var swiftType: String {
+        if isReference {
+            return isOptional ? "UUID?" : "UUID"
+        }
+        if isArray {
+            return isOptional ? "[\(type.swiftType)]?" : "[\(type.swiftType)]"
+        }
         let base = type.swiftType
         return isOptional ? "\(base)?" : base
     }
 
-    /// The Postgres column type (e.g. "TEXT", "UUID").
+    /// The Postgres column type (e.g. "TEXT", "UUID", "BIGINT[]").
     var postgresType: String {
-        type.postgresType
+        if isReference { return "UUID" }
+        if isArray { return "\(type.postgresType)[]" }
+        return type.postgresType
     }
 
     /// The Spectro property wrapper to use.
@@ -34,72 +59,118 @@ struct ParsedField {
         return "@Column"
     }
 
-    /// The SQL column definition.
+    /// The SQL column definition for CREATE TABLE.
     var sqlDefinition: String {
         var parts = ["\"\(columnName)\" \(postgresType)"]
         if !isOptional {
             parts.append("NOT NULL")
         }
-        if let defaultValue = type.defaultValue, !isOptional {
+        if let defaultValue = type.defaultValue, !isOptional, !isReference, !isArray {
             parts.append("DEFAULT \(defaultValue)")
         }
         if isReference {
-            // category_id → references "categories"("id")
-            let baseName = String(columnName.dropLast(3))  // strip _id
+            let baseName: String
+            if columnName.hasSuffix("_id") {
+                baseName = String(columnName.dropLast(3))
+            } else {
+                baseName = columnName
+            }
             let refTable = pluralize(baseName)
             parts.append("REFERENCES \"\(refTable)\"(\"id\")")
         }
         return parts.joined(separator: " ")
+    }
+
+    /// Human-readable label for forms (e.g. "firstName" → "FirstName").
+    var displayName: String {
+        swiftName.prefix(1).uppercased() + swiftName.dropFirst()
+    }
+
+    /// The HTML input type for form generation.
+    var htmlInputType: String {
+        if isReference { return "text" }
+        switch type {
+        case .string, .uuid: return "text"
+        case .text, .json: return "textarea"
+        case .int: return "number"
+        case .double: return "number"
+        case .bool: return "checkbox"
+        case .date: return "datetime-local"
+        case .data: return "file"
+        }
+    }
+
+    /// Whether this field should be rendered as a textarea in forms.
+    var isTextarea: Bool {
+        type == .text || type == .json
+    }
+
+    /// Whether this field is user-editable in forms (references are auto-set).
+    var isFormField: Bool {
+        !isReference
     }
 }
 
 /// Supported CLI field types.
 enum FieldType: String {
     case string
+    case text
     case int
     case double
     case bool
     case uuid
     case date
+    case json
+    case data
 
     var swiftType: String {
         switch self {
         case .string: "String"
+        case .text: "String"
         case .int: "Int"
         case .double: "Double"
         case .bool: "Bool"
         case .uuid: "UUID"
         case .date: "Date"
+        case .json: "String"
+        case .data: "Data"
         }
     }
 
     var postgresType: String {
         switch self {
         case .string: "TEXT"
-        case .int: "INT"
-        case .double: "DOUBLE PRECISION"
+        case .text: "TEXT"
+        case .int: "BIGINT"
+        case .double: "NUMERIC"
         case .bool: "BOOLEAN"
         case .uuid: "UUID"
         case .date: "TIMESTAMPTZ"
+        case .json: "JSONB"
+        case .data: "BYTEA"
         }
     }
 
     var defaultValue: String? {
         switch self {
-        case .string: nil
+        case .bool: "true"
         case .int: "0"
         case .double: "0"
-        case .bool: "true"
-        case .uuid: nil
-        case .date: nil
+        default: nil
         }
     }
 }
 
-/// Parses `name:type` and `name:type:modifier` field strings.
+/// Parses field strings from CLI arguments.
 ///
-///     parseFields(["name:string", "price:double", "category_id:uuid:references"])
-///
+/// Supported formats:
+///   - `name:type` — basic field
+///   - `name:type?` — optional field
+///   - `name:type[]` — array field (Postgres only)
+///   - `name:reference` — foreign key (UUID + REFERENCES)
+///   - `name:reference?` — optional foreign key
+///   - `name:type:optional` — legacy optional syntax
+///   - `name:uuid:references` — legacy reference syntax
 enum FieldParser {
     static func parse(_ args: [String]) throws -> [ParsedField] {
         try args.map { arg in
@@ -107,16 +178,35 @@ enum FieldParser {
             guard parts.count >= 2 else {
                 throw FieldParserError.invalidFormat(arg)
             }
+
             let name = parts[0]
-            guard let type = FieldType(rawValue: parts[1]) else {
-                throw FieldParserError.unknownType(parts[1])
+            var typeStr = parts[1]
+
+            // Check for ? suffix (optional)
+            let optionalSuffix = typeStr.hasSuffix("?")
+            if optionalSuffix { typeStr = String(typeStr.dropLast()) }
+
+            // Check for [] suffix (array)
+            let arraySuffix = typeStr.hasSuffix("[]")
+            if arraySuffix { typeStr = String(typeStr.dropLast(2)) }
+
+            // Check for reference type
+            let isRefType = typeStr == "reference"
+            if isRefType { typeStr = "uuid" }
+
+            guard let type = FieldType(rawValue: typeStr) else {
+                throw FieldParserError.unknownType(typeStr)
             }
+
+            // Legacy modifier support (name:type:optional, name:uuid:references)
             let modifiers = Set(parts.dropFirst(2))
+
             return ParsedField(
                 name: name,
                 type: type,
-                isOptional: modifiers.contains("optional"),
-                isReference: modifiers.contains("references")
+                isOptional: optionalSuffix || modifiers.contains("optional"),
+                isReference: isRefType || modifiers.contains("references"),
+                isArray: arraySuffix
             )
         }
     }
@@ -131,7 +221,7 @@ enum FieldParserError: Error, CustomStringConvertible {
         case .invalidFormat(let s):
             "Invalid field format '\(s)'. Expected name:type (e.g. name:string)"
         case .unknownType(let t):
-            "Unknown type '\(t)'. Valid types: string, int, double, bool, uuid, date"
+            "Unknown type '\(t)'. Valid types: string, text, int, double, bool, date, json, data, uuid, reference"
         }
     }
 }
@@ -169,4 +259,16 @@ func toSnakeCaseFromPascal(_ input: String) -> String {
     input
         .replacing(#/([a-z])([A-Z])/#) { "\($0.output.1)_\($0.output.2)" }
         .lowercased()
+}
+
+/// Converts "post" to "Post".
+func toPascalCase(_ input: String) -> String {
+    input.split(separator: "_")
+        .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        .joined()
+}
+
+/// Lowercases the first character: "Post" → "post", "PostComment" → "postComment".
+func toLowerFirst(_ input: String) -> String {
+    input.prefix(1).lowercased() + input.dropFirst()
 }

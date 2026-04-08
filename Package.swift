@@ -23,7 +23,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/Spectro-ORM/ESW.git",
-            from: "1.0.0"
+            from: "1.2.0"
         ),
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
