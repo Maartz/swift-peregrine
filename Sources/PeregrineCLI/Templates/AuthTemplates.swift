@@ -322,11 +322,8 @@ enum AuthTemplates {
     // MARK: - Helpers
 
     static func migrationFilename(table: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMddHHmmss"
-        let timestamp = formatter.string(from: Date())
-        let pascalTable = table.prefix(1).uppercased() + table.dropFirst()
-        return "\(timestamp)_Create\(pascalTable).sql"
+        let timestamp = Int(Date().timeIntervalSince1970)
+        return "\(timestamp)_create_\(table).sql"
     }
 
     // MARK: - ESW Templates

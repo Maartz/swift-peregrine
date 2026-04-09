@@ -245,11 +245,54 @@ func toSnakeCase(_ input: String) -> String {
 
 /// Simple English pluralization.
 func pluralize(_ word: String) -> String {
-    if word.hasSuffix("s") || word.hasSuffix("x") || word.hasSuffix("ch") || word.hasSuffix("sh") {
+    let lower = word.lowercased()
+
+    // Irregular plurals
+    let irregulars: [String: String] = [
+        "person": "people", "child": "children", "man": "men",
+        "woman": "women", "mouse": "mice", "goose": "geese",
+        "tooth": "teeth", "foot": "feet", "datum": "data",
+        "index": "indices", "matrix": "matrices", "vertex": "vertices",
+        "ox": "oxen", "quiz": "quizzes", "status": "statuses",
+    ]
+    if let irregular = irregulars[lower] {
+        // Preserve original casing of first char
+        if word.first?.isUppercase == true {
+            return irregular.prefix(1).uppercased() + irregular.dropFirst()
+        }
+        return irregular
+    }
+
+    // Already-plural patterns — don't double-pluralize
+    let alreadyPlural = ["ies", "ves", "oes", "ses", "xes", "zes", "ches", "shes"]
+    for suffix in alreadyPlural {
+        if lower.hasSuffix(suffix) { return word }
+    }
+
+    // Words ending in "s" that are already plural (heuristic: 4+ chars ending in
+    // a consonant + "s" that isn't "ss"/"us"/"is")
+    if lower.hasSuffix("s") && !lower.hasSuffix("ss") && !lower.hasSuffix("us") && !lower.hasSuffix("is") && lower.count >= 4 {
+        return word
+    }
+
+    // Standard English rules
+    if lower.hasSuffix("ss") || lower.hasSuffix("sh") || lower.hasSuffix("ch") || lower.hasSuffix("x") || lower.hasSuffix("z") {
         return word + "es"
     }
-    if word.hasSuffix("y") && !word.hasSuffix("ay") && !word.hasSuffix("ey") && !word.hasSuffix("oy") && !word.hasSuffix("uy") {
+    if lower.hasSuffix("us") {
+        return String(word.dropLast(2)) + "i"  // cactus → cacti
+    }
+    if lower.hasSuffix("is") {
+        return String(word.dropLast(2)) + "es"  // analysis → analyses
+    }
+    if lower.hasSuffix("y") && !lower.hasSuffix("ay") && !lower.hasSuffix("ey") && !lower.hasSuffix("oy") && !lower.hasSuffix("uy") {
         return String(word.dropLast()) + "ies"
+    }
+    if lower.hasSuffix("f") {
+        return String(word.dropLast()) + "ves"  // leaf → leaves
+    }
+    if lower.hasSuffix("fe") {
+        return String(word.dropLast(2)) + "ves"  // knife → knives
     }
     return word + "s"
 }
