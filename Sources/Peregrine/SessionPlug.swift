@@ -21,7 +21,13 @@ public let defaultSessionTTL: Duration = .seconds(24 * 3600)
 /// Generates a URL-safe, cryptographically random session identifier.
 private func generateSessionID() -> String {
     var bytes = [UInt8](repeating: 0, count: 32)
+    #if os(Linux)
+    let fd = open("/dev/urandom", O_RDONLY)
+    defer { close(fd) }
+    _ = read(fd, &bytes, 32)
+    #else
     _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    #endif
     return Data(bytes).base64EncodedString()
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")
