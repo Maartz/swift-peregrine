@@ -2,9 +2,20 @@ import Foundation
 import HTTPTypes
 import Nexus
 import NexusRouter
-import os
 
+#if os(macOS)
+import os
+private let logger = os.Logger(subsystem: "peregrine", category: "error")
+#else
+private struct Logger {
+    let subsystem: String
+    let category: String
+    func error(_ message: String) {
+        FileHandle.standardError.write(("\(message)\n").data(using: .utf8) ?? Data())
+    }
+}
 private let logger = Logger(subsystem: "peregrine", category: "error")
+#endif
 
 /// A custom error page renderer.
 ///
