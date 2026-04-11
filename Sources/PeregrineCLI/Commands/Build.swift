@@ -116,9 +116,9 @@ struct Build: AsyncParsableCommand {
 
          // Initial build
         print("[peregrine] Building...")
-        let startTime = currentTime()                          // ✅ MODIFIÉ
+        let startTime = currentTime()
         let success = runBuildSync(cwd: cwd)
-        let duration = currentTime() - startTime               // ✅ MODIFIÉ
+        let duration = currentTime() - startTime
 
         if success {
             print("[peregrine] Build complete. (\(String(format: "%.1f", duration))s)")
@@ -154,12 +154,12 @@ struct Build: AsyncParsableCommand {
             }
 
             print("[peregrine] Rebuilding...")
-            let rebuildStart = currentTime()                   // ✅ MODIFIÉ
+            let rebuildStart = currentTime()
 
             processManager.stopServer()
 
             let rebuildSuccess = self.runBuildSync(cwd: cwd)
-            let rebuildDuration = currentTime() - rebuildStart // ✅ MODIFIÉ
+            let rebuildDuration = currentTime() - rebuildStart
 
             if rebuildSuccess {
                 print("[peregrine] Build complete. (\(String(format: "%.1f", rebuildDuration))s)")

@@ -101,5 +101,6 @@ secret-*.*
 .moai/memory/
 .moai/worktrees/
 
-.clj-kondo
-.lsp
+.clj-kondo/
+.lsp/
+.vscode/
