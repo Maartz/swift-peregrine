@@ -1,5 +1,10 @@
 import Foundation
+
+
+#if os(Linux)
 import FoundationNetworking
+#endif
+
 @preconcurrency import Noora
 
 enum Downloader {
