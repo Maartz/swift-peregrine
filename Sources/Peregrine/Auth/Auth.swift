@@ -149,11 +149,20 @@ public enum Auth {
     }
 
     /// Generate cryptographically random bytes using the system CSPRNG.
-    static func generateRandomBytes(count: Int) -> [UInt8] {
-        var bytes = [UInt8](repeating: 0, count: count)
-        _ = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
-        return bytes
+static func generateRandomBytes(count: Int) -> [UInt8] {
+    #if os(macOS)
+    var bytes = [UInt8](repeating: 0, count: count)
+    _ = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+    return bytes
+    #else
+    var generator = SystemRandomNumberGenerator()
+    var bytes = [UInt8](repeating: 0, count: count)
+    for i in 0..<count {
+        bytes[i] = UInt8.random(in: UInt8.min...UInt8.max, using: &generator)
     }
+    return bytes
+    #endif
+}
 
     /// URL-safe base64 encoding (no padding).
     static func base64URLEncode(_ bytes: [UInt8]) -> String {

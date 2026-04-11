@@ -1,6 +1,16 @@
 import ArgumentParser
 import Foundation
+import CoreFoundation
 @preconcurrency import Noora
+
+// Cross-platform time helper
+private func currentTime() -> Double {
+    #if os(Linux)
+    return Date().timeIntervalSince1970
+    #else
+    return CFAbsoluteTimeGetCurrent()
+    #endif
+}
 
 struct Build: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -104,11 +114,11 @@ struct Build: AsyncParsableCommand {
         }
         sigintSource.resume()
 
-        // Initial build
+         // Initial build
         print("[peregrine] Building...")
-        let startTime = CFAbsoluteTimeGetCurrent()
+        let startTime = currentTime()
         let success = runBuildSync(cwd: cwd)
-        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        let duration = currentTime() - startTime
 
         if success {
             print("[peregrine] Build complete. (\(String(format: "%.1f", duration))s)")
@@ -144,12 +154,12 @@ struct Build: AsyncParsableCommand {
             }
 
             print("[peregrine] Rebuilding...")
-            let rebuildStart = CFAbsoluteTimeGetCurrent()
+            let rebuildStart = currentTime()
 
             processManager.stopServer()
 
             let rebuildSuccess = self.runBuildSync(cwd: cwd)
-            let rebuildDuration = CFAbsoluteTimeGetCurrent() - rebuildStart
+            let rebuildDuration = currentTime() - rebuildStart
 
             if rebuildSuccess {
                 print("[peregrine] Build complete. (\(String(format: "%.1f", rebuildDuration))s)")
