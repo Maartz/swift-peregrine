@@ -100,3 +100,6 @@ secret-*.*
 .moai/status_line.sh
 .moai/memory/
 .moai/worktrees/
+
+.clj-kondo
+.lsp
