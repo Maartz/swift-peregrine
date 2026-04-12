@@ -62,3 +62,63 @@ jobs:
       - name: Test
         working-directory: Peregrine
         run: swift test
+
+  build-and-test-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Peregrine
+        uses: actions/checkout@v4
+        with:
+          path: Peregrine
+
+      - name: Checkout Spectro
+        uses: actions/checkout@v4
+        with:
+          repository: Spectro-ORM/Spectro
+          path: Spectro
+
+      - name: Checkout Nexus
+        uses: actions/checkout@v4
+        with:
+          repository: Spectro-ORM/Nexus
+          path: Nexus
+
+      - name: Checkout ESW
+        uses: actions/checkout@v4
+        with:
+          repository: Spectro-ORM/ESW
+          path: esw
+
+      - name: Pin ESW to Swift 6.1 tools version
+        run: |
+          sed -i 's|swift-tools-version: 6.3|swift-tools-version: 6.1|' esw/Package.swift
+
+      - name: Override remote deps with local checkouts
+        working-directory: Peregrine
+        run: |
+          python3 -c "
+          import re
+          with open('Package.swift') as f:
+              s = f.read()
+          s = re.sub(r'\.package\(\s*url:\s*\"https://github\.com/Spectro-ORM/Spectro\.git\",\s*from:\s*\"[^\"]+\"\s*\)', '.package(path: \"../Spectro\")', s)
+          s = re.sub(r'\.package\(\s*url:\s*\"https://github\.com/Spectro-ORM/Nexus\.git\",\s*from:\s*\"[^\"]+\"\s*\)', '.package(path: \"../Nexus\")', s)
+          s = re.sub(r'\.package\(\s*url:\s*\"https://github\.com/Spectro-ORM/ESW\.git\",\s*from:\s*\"[^\"]+\"\s*\)', '.package(path: \"../esw\")', s)
+          with open('Package.swift', 'w') as f:
+              f.write(s)
+          "
+
+      - name: Install Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.1"
+
+      - name: Verify Swift
+        run: swift --version
+
+      - name: Build
+        working-directory: Peregrine
+        run: swift build
+
+      - name: Test
+        working-directory: Peregrine
+        run: swift test
